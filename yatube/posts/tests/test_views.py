@@ -10,7 +10,7 @@ from django.core.paginator import Page
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from ..models import Comment, Group, Post
+from ..models import Comment, Group, Post, Follow
 
 User = get_user_model()
 
@@ -484,3 +484,168 @@ class PostAdditionalCheck(TestCase):
         self.assertEqual(posts_pub_date_0, self.post.pub_date)
         self.assertEqual(posts_author_0, self.post.author)
         self.assertEqual(posts_group_0, self.post.group)
+
+
+class FollowViewsTests(TestCase):
+    '''Проверка работы подписок'''
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create_user(username='test_user')
+        cls.author = User.objects.create_user(username='test_author')
+        cls.user2 = User.objects.create_user(username='test_user_2')
+
+        cls.group = Group.objects.create(
+            title='Тестовая группа',
+            slug='test_group',
+            description='Тестовое описание',
+        )
+        cls.group2 = Group.objects.create(
+            title='Тестовая группа 2',
+            slug='test_group2',
+            description='Тестовое описание другой группы',
+        )
+        cls.post = Post.objects.create(
+            author=cls.author,
+            text='Тестовый пост',
+            group=cls.group
+        )
+
+        cls.POSTS_BY_AUTHOR = 1
+        cls.ZERO_POSTS = 0
+
+    def setUp(self):
+        # Создаем неавторизованный клиент
+        self.guest_client = Client()
+        # Создаем авторизованый клиент (будет подписан на author)
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
+        # Создаем авторизованный клиент автора
+        self.authorized_author_client = Client()
+        self.authorized_author_client.force_login(self.author)
+        # Создаем авторизованный клиент без подписок
+        self.authorized_client_not_following = Client()
+        self.authorized_client_not_following.force_login(self.user2)
+
+    # Авторизованный пользователь может подписываться
+    # на других пользователей и удалять их из подписок.
+    def test_follow(self):
+        '''Проверка подписки на автора через увеличение подписок'''
+        count_follow = Follow.objects.filter(
+            user=FollowViewsTests.user).count()
+        data_follow = {
+            'user': FollowViewsTests.user,
+            'author': FollowViewsTests.author
+        }
+        follow_redirect = reverse(
+            'posts:profile',
+            kwargs={'username': FollowViewsTests.author.username}
+        )
+        response = self.authorized_client.post(
+            reverse(
+                'posts:profile_follow',
+                kwargs={'username': FollowViewsTests.author.username}
+            ),
+            data=data_follow, follow=True)
+        new_count_follow = Follow.objects.filter(
+            user=FollowViewsTests.user
+        ).count()
+        self.assertTrue(
+            Follow.objects.filter(
+                user=FollowViewsTests.user,
+                author=FollowViewsTests.author
+            ).exists()
+        )
+        self.assertRedirects(response, follow_redirect)
+        self.assertEqual(count_follow + 1, new_count_follow)
+
+    def test_unfollow(self):
+        '''Проверка отписки от автора через уменьшение подписок'''
+        count_follow = Follow.objects.filter(
+            user=FollowViewsTests.user
+        ).count()
+        data_follow = {
+            'user': FollowViewsTests.user,
+            'author': FollowViewsTests.author
+        }
+        # Подписываемся на автора
+        self.authorized_client.post(
+            reverse(
+                'posts:profile_follow',
+                kwargs={'username': FollowViewsTests.author.username}
+            ),
+            data=data_follow, follow=True)
+        # Отписываемся от автора
+        self.authorized_client.post(
+            reverse('posts:profile_unfollow', kwargs={
+                'username': FollowViewsTests.author}),
+            data=data_follow, follow=True)
+        new_count_follow = Follow.objects.filter(
+            user=FollowViewsTests.user
+        ).count()
+        self.assertFalse(Follow.objects.filter(
+            user=FollowViewsTests.user,
+            author=FollowViewsTests.author).exists())
+        self.assertEqual(count_follow, new_count_follow)
+
+    # Новая запись пользователя появляется в ленте тех, кто на него подписан
+    # и не появляется в ленте тех, кто не подписан.
+    def test_followers_get_posts(self):
+        '''Подписчик видит посты от автора на странице follow_index'''
+        data_follow = {
+            'user': FollowViewsTests.user,
+            'author': FollowViewsTests.author
+        }
+        # Подписываемся на автора
+        self.authorized_client.post(
+            reverse(
+                'posts:profile_follow',
+                kwargs={'username': FollowViewsTests.author.username}
+            ),
+            data=data_follow, follow=True)
+        cache.clear()
+        response = self.authorized_client.get(
+            reverse('posts:follow_index')
+        )
+        first_object = response.context['page_obj'][0]
+        posts_text_0 = first_object.text
+        posts_pub_date_0 = first_object.pub_date
+        posts_author_0 = first_object.author
+        posts_group_0 = first_object.group
+
+        self.assertEqual(
+            len(response.context['page_obj']),
+            self.POSTS_BY_AUTHOR
+        )
+
+        self.assertEqual(posts_text_0, self.post.text)
+        self.assertEqual(posts_pub_date_0, self.post.pub_date)
+        self.assertEqual(posts_author_0, self.post.author)
+        self.assertEqual(posts_group_0, self.post.group)
+
+    def test_not_followers_dont_get_posts(self):
+        '''Не подписчик не видит посты от автора на странице follow_index'''
+        cache.clear()
+        response = self.authorized_client_not_following.get(
+            reverse('posts:homepage')
+        )
+        first_object = response.context['page_obj'][0]
+        posts_text_0 = first_object.text
+        posts_pub_date_0 = first_object.pub_date
+        posts_author_0 = first_object.author
+        posts_group_0 = first_object.group
+
+        self.assertEqual(posts_text_0, self.post.text)
+        self.assertEqual(posts_pub_date_0, self.post.pub_date)
+        self.assertEqual(posts_author_0, self.post.author)
+        self.assertEqual(posts_group_0, self.post.group)
+
+        cache.clear()
+        response = self.authorized_client_not_following.get(
+            reverse('posts:follow_index')
+        )
+        self.assertEqual(
+            len(response.context['page_obj']),
+            self.ZERO_POSTS
+        )
