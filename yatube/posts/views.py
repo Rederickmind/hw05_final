@@ -122,9 +122,10 @@ def add_comment(request, post_id):
         comment.save()
     return redirect('posts:post_detail', post_id=post_id)
 
+
 @login_required
 def follow_index(request):
-    '''Лента постов от авторов из подписок'''   
+    '''Лента постов от авторов из подписок'''
     context = {
         'page_obj': get_page_obj(
             Post.objects.filter(author__following__user=request.user),
@@ -133,6 +134,7 @@ def follow_index(request):
     }
     return render(request, 'posts/follow_index.html', context)
 
+
 @login_required
 def profile_follow(request, username):
     '''Подписаться на автора'''
@@ -140,6 +142,7 @@ def profile_follow(request, username):
     if author != request.user:
         Follow.objects.get_or_create(user=request.user, author=author)
     return redirect('posts:profile', username=username)
+
 
 @login_required
 def profile_unfollow(request, username):
