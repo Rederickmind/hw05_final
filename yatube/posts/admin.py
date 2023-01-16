@@ -1,11 +1,10 @@
 from django.contrib import admin
 
-from .models import Group, Post
+from .models import Group, Post, Comment
 
 
 @admin.register(Post)
 class PostAdmin(admin.ModelAdmin):
-    # Перечисляем поля, которые должны отображаться в админке
     list_display = (
         'pk',
         'text',
@@ -13,14 +12,27 @@ class PostAdmin(admin.ModelAdmin):
         'author',
         'group'
     )
-    # Добавляем интерфейс для поиска по тексту постов
+    # Интерфейс для поиска по тексту постов
     search_fields = ('text',)
-    # Добавляем возможность менять поле group в любом посте
+    # Возможность менять поле group в любом посте
     list_editable = ('group',)
-    # Добавляем возможность фильтрации по дате
+    # Возможность фильтрации по дате
     list_filter = ('pub_date',)
-    # Свойство для пустых полей
+    # Свойство для пустых полей по-умолчанию
     empty_value_display = '-пусто-'
 
 
 admin.site.register(Group)
+
+
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = (
+        'post',
+        'author',
+        'text',
+        'created'
+    )
+
+    search_fields = ('text',)
+    list_filter = ('created', 'author', 'post',)

@@ -565,22 +565,22 @@ class FollowViewsTests(TestCase):
         count_follow = Follow.objects.filter(
             user=FollowViewsTests.user
         ).count()
-        data_follow = {
+
+        # Создаём подписку на автора
+        Follow.objects.get_or_create(
+            user=self.user,
+            author=self.author
+        )
+
+        # Отписываемся от автора
+        data_unfollow = {
             'user': FollowViewsTests.user,
             'author': FollowViewsTests.author
         }
-        # Подписываемся на автора
-        self.authorized_client.post(
-            reverse(
-                'posts:profile_follow',
-                kwargs={'username': FollowViewsTests.author.username}
-            ),
-            data=data_follow, follow=True)
-        # Отписываемся от автора
         self.authorized_client.post(
             reverse('posts:profile_unfollow', kwargs={
                 'username': FollowViewsTests.author}),
-            data=data_follow, follow=True)
+            data=data_unfollow, follow=True)
         new_count_follow = Follow.objects.filter(
             user=FollowViewsTests.user
         ).count()

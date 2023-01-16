@@ -128,7 +128,11 @@ def follow_index(request):
     '''Лента постов от авторов из подписок'''
     context = {
         'page_obj': get_page_obj(
-            Post.objects.filter(author__following__user=request.user),
+            Post.objects.select_related(
+                'author'
+            ).filter(
+                author__following__user=request.user
+            ),
             request
         )
     }
