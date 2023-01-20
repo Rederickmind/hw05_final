@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import cache_page
 
 from .forms import CommentForm, PostForm
-from .models import Comment, Group, Post, User, Follow
+from .models import Comment, Follow, Group, Post, User
 
 POSTS_AMOUNT = 10
 

@@ -10,7 +10,7 @@ from django.core.paginator import Page
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from ..models import Comment, Group, Post, Follow
+from ..models import Comment, Follow, Group, Post
 
 User = get_user_model()
 
